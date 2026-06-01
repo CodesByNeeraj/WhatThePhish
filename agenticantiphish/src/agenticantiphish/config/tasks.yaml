@@ -1,0 +1,228 @@
+# ── Phase 1: Campaign Creation ────────────────────────────────────────────────
+
+plan_campaign_task:
+  description: >
+    You have been given these phishing campaign parameters:
+      Department:       {department}
+      Urgency level:    {urgency}
+      Phishing technique: {technique}
+      Campaign ID:      {campaign_id}
+
+    Produce a detailed creative brief that tells the email generator exactly
+    how to write the phishing email. The brief must include:
+
+    1. TARGET PROFILE — describe the typical employee in {department} and what
+       makes them susceptible to {technique} attacks.
+    2. IMPERSONATION TARGET — who the email should appear to come from
+       (e.g. "IT Helpdesk", "CEO John Smith", "Microsoft Azure", "FedEx").
+       Include a realistic spoofed sender display name and a plausible
+       spoofed email address.
+    3. COVER STORY — the specific scenario the email will use (1-2 sentences).
+    4. URGENCY FRAMING — the exact urgency trigger to use given urgency={urgency}.
+    5. CALL TO ACTION — what the email asks the employee to do (click a link,
+       reset a password, confirm payment, etc.).
+    6. RED FLAGS PLANTED — list 4-6 subtle red flags intentionally embedded
+       for training purposes (these will be used in the explanation email later).
+
+    Return the brief as plain structured text under those six headings.
+  expected_output: >
+    A structured creative brief with six clearly labelled sections:
+    TARGET PROFILE, IMPERSONATION TARGET, COVER STORY, URGENCY FRAMING,
+    CALL TO ACTION, RED FLAGS PLANTED. Plain text, no markdown code blocks.
+  agent: campaign_planner
+
+generate_phishing_email_task:
+  description: >
+    Using the campaign brief from the previous task, generate a realistic
+    phishing simulation email for a {department} employee.
+
+    Campaign parameters:
+      Department:  {department}
+      Urgency:     {urgency}
+      Technique:   {technique}
+
+    Requirements:
+    - Write a convincing subject line (max 75 characters).
+    - Write a full HTML email body. Use inline styles for formatting.
+      Keep it clean — a real phishing email does not look obviously fake.
+    - Embed the placeholder [TRACKING_URL] exactly once as the href of the
+      primary call-to-action link (button or hyperlink). Do not modify it.
+    - Match the impersonation target, cover story and urgency from the brief.
+    - The HTML must be a complete email body fragment (not a full HTML document).
+
+    Output a JSON object with exactly these keys:
+      "subject"              - the subject line string
+      "html_body"            - the full HTML body string (with [TRACKING_URL])
+      "sender_name"          - display name (e.g. "IT Support Team")
+      "sender_email_display" - spoofed display email (e.g. "it-support@helpdesk-corp.com")
+  expected_output: >
+    A JSON object with keys: subject, html_body, sender_name, sender_email_display.
+    The html_body must contain exactly one [TRACKING_URL] placeholder.
+  agent: phishing_email_generator
+
+# ── Phase 2: Email Dispatch ───────────────────────────────────────────────────
+
+dispatch_emails_task:
+  description: >
+    Send the phishing simulation email to all campaign recipients and log
+    each send event to Splunk.
+
+    Inputs:
+      Campaign ID:     {campaign_id}
+      Department:      {department}
+      Subject:         {email_subject}
+      Sender Name:     {sender_name}
+      Sender Email:    {sender_email_display}
+      HTML Body:       {email_html_body}
+                       (contains [TRACKING_URL] placeholder — replace per recipient)
+      Recipients JSON: {recipients_json}
+                       (array of objects: email, name, token, tracking_url)
+
+    For EACH recipient in recipients_json:
+    Step 1 — Replace every occurrence of [TRACKING_URL] in email_html_body
+             with the recipient's tracking_url value.
+    Step 2 — Call EmailSendTool with:
+               to_email      = recipient.email
+               subject       = {email_subject}
+               html_body     = personalised body from Step 1
+               sender_name   = {sender_name}
+               sender_email  = {sender_email_display}
+    Step 3 — Call SplunkHECTool with:
+               event      = {{"type": "phishing_sent", "campaign_id": "{campaign_id}",
+                             "recipient_email": "<recipient.email>",
+                             "department": "{department}", "token": "<recipient.token>",
+                             "is_simulation": true}}
+               sourcetype = "phishing:sent"
+
+    After processing all recipients, report the total sent count and any failures.
+  expected_output: >
+    A plain-text summary: how many emails were sent successfully, how many
+    failed (with reason), and confirmation that Splunk events were logged.
+    Format: "Sent: X/Y. Failed: Z. Splunk events logged: X."
+  agent: email_dispatcher
+
+# ── Phase 3: Detection ────────────────────────────────────────────────────────
+
+detect_clicks_task:
+  description: >
+    Query Splunk to find employees who have clicked a phishing simulation
+    link in the last hour.
+
+    Use SplunkMCPTool with this query:
+      query:          "index=phishing_sim sourcetype=\"phishing:click\" earliest=-1h | table token, employee_email, department, campaign_id, _time"
+      earliest_time:  "-1h"
+      latest_time:    "now"
+
+    Parse the query result to extract the list of clickers.
+    Each clicker must have: token, employee_email, department, campaign_id, click_time.
+
+    If the query fails or returns no results, return an empty JSON array: []
+
+    Return ONLY a valid JSON array. No explanation, no markdown, just the array.
+  expected_output: >
+    A valid JSON array of clicker objects. Each object has:
+    token (string), employee_email (string), department (string),
+    campaign_id (string), click_time (string).
+    Example: [{"token": "abc123", "employee_email": "jane@co.com",
+    "department": "Finance", "campaign_id": "camp_001", "click_time": "2026-06-01T12:00:00"}]
+    Return [] if no clicks found.
+  agent: splunk_monitor
+
+# ── Phase 4: Automated Response ──────────────────────────────────────────────
+
+explain_threat_task:
+  description: >
+    Write a personalised, empathetic threat explanation for {employee_email},
+    who just clicked a phishing simulation email.
+
+    The phishing email they received:
+      Subject:          {phishing_subject}
+      Sender display:   {phishing_sender}
+      Technique used:   {technique}
+      Department:       {department}
+
+    Your explanation must:
+    1. Open by clearly stating this was a safe, authorised simulation —
+       they are not in trouble and no real harm occurred.
+    2. List 4-6 specific red flags IN THIS EMAIL they should have noticed.
+       Reference the actual subject line and sender display name.
+       Each red flag must explain WHY it is suspicious.
+    3. Use plain, friendly language. No jargon. No shame.
+    4. Be between 280 and 380 words.
+    5. Do NOT include HTML tags — plain text only.
+  expected_output: >
+    A 280-380 word plain-text explanation addressed to the employee.
+    Contains 4-6 numbered red flags that reference the specific subject
+    and sender from the simulation. No HTML, no markdown headers.
+  agent: threat_explainer
+
+generate_training_task:
+  description: >
+    Generate a short security awareness training module for an employee
+    who clicked a "{technique}" phishing simulation.
+
+    The module must contain:
+    1. A clear title: "Security Tip: Spotting {technique} Phishing"
+    2. Exactly three key lessons — each 1-2 sentences — specific to
+       how "{technique}" attacks work and how to spot them.
+    3. A 3-question multiple-choice quiz. Each question has 4 options
+       and one correct answer.
+
+    Return a JSON object with exactly these keys:
+      "title"   — string
+      "lessons" — array of 3 strings
+      "quiz"    — array of 3 objects, each with:
+                    "question"      (string)
+                    "options"       (array of 4 strings)
+                    "correct_index" (integer 0-3)
+  expected_output: >
+    A JSON object with keys: title (string), lessons (array of 3 strings),
+    quiz (array of 3 objects each with question, options[4], correct_index).
+    No markdown wrapping — raw JSON only.
+  agent: training_content_generator
+
+send_response_task:
+  description: >
+    Compose and send the remediation email to {employee_email}, then log
+    the training enrolment to Splunk.
+
+    You have in your context:
+    - The threat explanation from the previous task (plain text)
+    - The training module JSON from the task before that
+
+    Recipient:   {employee_email}
+    Token:       {token}
+    Campaign ID: {campaign_id}
+
+    Step 1 — Compose an HTML email with:
+      Subject: "Security Awareness: You clicked a phishing simulation"
+      Body structure:
+        <h2> banner: "Security Simulation Alert"</h2>
+        <p>  short intro (1 sentence) </p>
+        <h3> "What just happened?" </h3>
+        <p>  Insert the threat explanation from context (convert line breaks to <br>) </p>
+        <h3> "What to watch for next time" </h3>
+        <ul> The 3 training lessons as list items </ul>
+        <h3> "Quick Knowledge Check" </h3>
+        <ol> The 3 quiz questions with their 4 options listed (do not reveal correct answer) </ol>
+        <p>  Friendly closing: contact security team with any questions </p>
+      Use inline CSS. Keep it clean and professional.
+
+    Step 2 — Call EmailSendTool with:
+               to_email     = {employee_email}
+               subject      = "Security Awareness: You clicked a phishing simulation"
+               html_body    = the composed HTML from Step 1
+               sender_name  = "Security Awareness Team"
+               sender_email = ""
+
+    Step 3 — Call SplunkHECTool with:
+               event      = {{"type": "training_enrolled", "token": "{token}",
+                             "campaign_id": "{campaign_id}",
+                             "employee_email": "{employee_email}",
+                             "is_simulation": true}}
+               sourcetype = "phishing:training"
+  expected_output: >
+    Confirmation that the remediation email was sent to {employee_email}
+    and that the training_enrolled event was logged to Splunk.
+    Format: "Remediation email sent to <email>. Splunk training_enrolled event logged."
+  agent: response_sender
