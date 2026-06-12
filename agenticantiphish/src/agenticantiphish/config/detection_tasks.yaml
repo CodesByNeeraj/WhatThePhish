@@ -1,0 +1,24 @@
+detect_clicks_task:
+  description: >
+    Query Splunk to find employees who have clicked a phishing simulation
+    link in the last hour.
+
+    Use SplunkMCPTool with this query:
+      query:          "index=phishing_sim sourcetype=\"phishing:click\" | table token, employee_email, department, campaign_id"
+      earliest_time:  "-24h"
+      latest_time:    "now"
+
+    Parse the query result to extract the list of all clickers.
+    Each clicker must have: token, employee_email, department, campaign_id.
+
+    If the query fails or returns no results, return an empty JSON array: []
+
+    Return ONLY a valid JSON array. No explanation, no markdown, just the array.
+  expected_output: >
+    A valid JSON array of clicker objects.
+    Each object has: token (string), employee_email (string), department (string),
+    campaign_id (string).
+    Example: [{"token": "abc123", "employee_email": "jane@co.com",
+    "department": "Finance", "campaign_id": "camp_001"}]
+    Return [] if no clicks found.
+  agent: splunk_monitor
