@@ -1,0 +1,76 @@
+plan_campaign_task:
+  description: >
+    You have been given these phishing campaign parameters:
+      Department:       {department}
+      Urgency level:    {urgency}
+      Phishing technique: {technique}
+      Campaign ID:      {campaign_id}
+
+    Produce a detailed creative brief that tells the email generator exactly
+    how to write the phishing email. The brief must include:
+
+    1. TARGET PROFILE — describe the typical employee in {department} and what
+       makes them susceptible to {technique} attacks.
+    2. IMPERSONATION TARGET — who the email should appear to come from
+       (e.g. "IT Helpdesk", "CEO John Smith", "Microsoft Azure", "FedEx").
+       Include a realistic spoofed sender display name and a plausible
+       spoofed email address.
+    3. COVER STORY — the specific scenario the email will use (1-2 sentences).
+    4. URGENCY FRAMING — the exact urgency trigger to use given urgency={urgency}.
+    5. CALL TO ACTION — what the email asks the employee to do (click a link,
+       reset a password, confirm payment, etc.).
+    6. RED FLAGS PLANTED — list 4-6 subtle red flags intentionally embedded
+       for training purposes (these will be used in the explanation email later).
+
+    Return the brief as plain structured text under those six headings.
+  expected_output: >
+    A structured creative brief with six clearly labelled sections:
+    TARGET PROFILE, IMPERSONATION TARGET, COVER STORY, URGENCY FRAMING,
+    CALL TO ACTION, RED FLAGS PLANTED. Plain text, no markdown code blocks.
+  agent: campaign_planner
+
+generate_phishing_email_task:
+  description: >
+    Using the campaign brief from the previous task, generate a realistic
+    phishing simulation email for a {department} employee.
+
+    Campaign parameters:
+      Department:  {department}
+      Urgency:     {urgency}
+      Technique:   {technique}
+
+    Requirements:
+    - Write a convincing subject line (max 75 characters).
+    - Write a full HTML email body using EXACTLY this CSS structure.
+      Do NOT change the CSS values — only fill in the content.
+
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;padding:32px;border:1px solid #e8e8e8;">
+        <p style="font-size:14px;color:#333;line-height:1.8;margin:0 0 16px 0;">Dear [RECIPIENT_NAME],</p>
+        <p style="font-size:14px;color:#333;line-height:1.8;margin:0 0 16px 0;">[EMAIL BODY — paragraphs as separate &lt;p&gt; tags]</p>
+        <p style="font-size:14px;color:#333;line-height:1.8;margin:0 0 24px 0;">
+          <a href="[TRACKING_URL]" style="display:inline-block;background:#0066cc;color:#ffffff;padding:12px 24px;text-decoration:none;border-radius:4px;font-size:14px;font-weight:bold;">[CALL TO ACTION BUTTON TEXT]</a>
+        </p>
+        <p style="font-size:14px;color:#333;line-height:1.8;margin:0;">[SIGN-OFF]</p>
+      </div>
+    - Embed the placeholder [TRACKING_URL] exactly once as the href of the
+      primary call-to-action link (button or hyperlink). Do not modify it.
+    - Open the email body with "Dear [RECIPIENT_NAME]," — use exactly this
+      placeholder, it will be replaced with the real name at send time.
+    - Close the email with a sign-off appropriate to the impersonation target
+      and technique. Examples:
+        credential_harvesting / it_helpdesk  → "IT Security Team"
+        executive_impersonation              → "Office of the CEO"
+        invoice_fraud                        → "Finance & Accounts"
+        delivery_notification                → "Delivery Operations"
+      Never use "[Your Name]" or leave the sign-off blank.
+    - Match the impersonation target, cover story and urgency from the brief.
+    - The HTML must be a complete email body fragment (not a full HTML document).
+
+    Output a JSON object with exactly these keys:
+      "subject"     - the subject line string
+      "html_body"   - the full HTML body string (with [TRACKING_URL])
+      "sender_name" - display name (e.g. "IT Support Team")
+  expected_output: >
+    A JSON object with keys: subject, html_body, sender_name.
+    The html_body must contain exactly one [TRACKING_URL] placeholder.
+  agent: phishing_email_generator
