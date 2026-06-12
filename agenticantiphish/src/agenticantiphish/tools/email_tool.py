@@ -12,23 +12,15 @@ class EmailSendInput(BaseModel):
     to_email: str = Field(..., description="Recipient email address.")
     subject: str = Field(..., description="Email subject line.")
     html_body: str = Field(..., description="Full HTML body of the email.")
-    sender_name: str = Field(
-        default="IT Security Team",
-        description="Display name shown as the sender.",
-    )
-    sender_email: str = Field(
-        default="",
-        description="Sender display email address. Defaults to SMTP_USER if empty.",
-    )
+    sender_name: str = Field(default="IT Security Team", description="Display name of the sender.")
+    sender_email: str = Field(default="", description="Sender display address (optional).")
 
 
 class EmailSendTool(BaseTool):
     name: str = "EmailSendTool"
     description: str = (
-        "Send an HTML email via SMTP. Use for sending phishing simulation emails "
-        "to recipients and for sending remediation/training emails to employees "
-        "who clicked. Provide to_email, subject, html_body, sender_name, and "
-        "optionally a spoofed sender_email for simulation emails."
+        "Send an HTML email via Gmail SMTP. Use for phishing simulation emails "
+        "and remediation/training emails."
     )
     args_schema: Type[BaseModel] = EmailSendInput
 
@@ -49,8 +41,8 @@ class EmailSendTool(BaseTool):
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = display_from
-        msg["To"] = to_email
+        msg["From"]    = display_from
+        msg["To"]      = to_email
         msg.attach(MIMEText(html_body, "html"))
 
         try:
@@ -61,6 +53,6 @@ class EmailSendTool(BaseTool):
                 server.sendmail(smtp_user, to_email, msg.as_string())
             return f"Email sent to {to_email} — subject: '{subject}'"
         except smtplib.SMTPAuthenticationError:
-            return f"SMTP auth failed. Check SMTP_USER and SMTP_PASS in .env."
+            return "SMTP auth failed. Check SMTP_USER and SMTP_PASS in .env."
         except Exception as e:
             return f"Email send failed for {to_email}: {e}"
