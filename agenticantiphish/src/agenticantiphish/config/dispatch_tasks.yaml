@@ -1,0 +1,32 @@
+dispatch_emails_task:
+  description: >
+    Send the phishing simulation email to all campaign recipients and log
+    each send event to Splunk.
+
+    Inputs:
+      Campaign ID:     {campaign_id}
+      Department:      {department}
+      Subject:         {email_subject}
+      Sender Name:     {sender_name}
+      Sender Email:    (use the configured SMTP sender)
+      HTML Body:       {email_html_body}
+                       (contains [TRACKING_URL] placeholder — replace per recipient)
+      Recipients JSON: {recipients_json}
+                       (array of objects: email, name, token, tracking_url)
+
+    For EACH recipient in recipients_json:
+    Step 1 — Replace every occurrence of [TRACKING_URL] in email_html_body
+             with the recipient's tracking_url value. Also replace every
+             occurrence of [RECIPIENT_NAME] with the recipient's name value.
+    Step 2 — Call EmailSendTool with:
+               to_email      = recipient.email
+               subject       = {email_subject}
+               html_body     = personalised body from Step 1
+               sender_name   = {sender_name}
+               sender_email  = ""
+    After processing all recipients, report the total sent count and any failures.
+  expected_output: >
+    A plain-text summary: how many emails were sent successfully and how many
+    failed (with reason).
+    Format: "Sent: X/Y. Failed: Z."
+  agent: email_dispatcher
