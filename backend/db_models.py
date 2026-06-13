@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.database import Base
 
 
+#Database models for phishing campaigns, recipients, and click events. These models define the structure of the database tables used to store information about phishing simulation campaigns, the employees targeted in those campaigns, and the click events generated when employees interact with the phishing emails. The Campaign model captures details about each phishing campaign, including its department, urgency, technique, email content, and associated recipients and clicks. The Recipient model stores information about each employee targeted in a campaign, including their email, name, unique tracking token, and the URL used for tracking clicks. The Click model records each click event with metadata about the employee, department, campaign, and timestamp of the click.
 class Campaign(Base):
     __tablename__ = "campaigns"
 
@@ -28,7 +29,7 @@ class Recipient(Base):
     id: Mapped[int]           = mapped_column(Integer, primary_key=True, autoincrement=True)
     campaign_id: Mapped[str]  = mapped_column(String, ForeignKey("campaigns.id"))
     email: Mapped[str]        = mapped_column(String)
-    name: Mapped[str]         = mapped_column(String, default="")
+    name:Mapped[str]         = mapped_column(String, default="")
     token: Mapped[str]        = mapped_column(String, unique=True, index=True)
     tracking_url: Mapped[str] = mapped_column(String)
 
