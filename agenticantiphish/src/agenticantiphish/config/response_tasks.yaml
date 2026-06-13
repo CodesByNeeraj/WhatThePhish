@@ -1,0 +1,108 @@
+explain_threat_task:
+  description: >
+    Write a personalised, empathetic threat explanation for {employee_email},
+    who just clicked a phishing simulation email.
+
+    The phishing email they received:
+      Subject:          {phishing_subject}
+      Sender name:      {phishing_sender}
+      Technique used:   {technique}
+      Department:       {department}
+
+    Your explanation must:
+    1. Open by clearly stating this was a safe, authorised simulation —
+       they are not in trouble and no real harm occurred.
+    2. List 4-6 specific red flags IN THIS EMAIL they should have noticed.
+       - Reference the actual subject line and sender display name where relevant.
+       - When discussing the sender address, speak ONLY about the TYPE of
+         suspicious pattern (e.g. "unknown external domain", "spoofed display name
+         that doesn't match a real company address") — do NOT invent or quote a
+         specific email address that was not provided to you.
+       - Each red flag must explain WHY it is suspicious.
+    3. Use plain, friendly language. No jargon. No shame.
+    4. Be between 280 and 380 words.
+    5. Do NOT include HTML tags — plain text only.
+  expected_output: >
+    A 280-380 word plain-text explanation addressed to the employee.
+    Contains 4-6 numbered red flags that reference the specific subject
+    and sender from the simulation. No HTML, no markdown headers.
+  agent: threat_explainer
+
+generate_training_task:
+  description: >
+    Generate a short security awareness training module for an employee
+    who clicked a "{technique}" phishing simulation.
+
+    The module must contain:
+    1. A clear title: "Security Tip: Spotting {technique} Phishing"
+    2. Exactly three key lessons — each 1-2 sentences — specific to
+       how "{technique}" attacks work and how to spot them.
+    3. A 3-question multiple-choice quiz. Each question has 4 options
+       and one correct answer.
+
+    Return a JSON object with exactly these keys:
+      "title"   — string
+      "lessons" — array of 3 strings
+      "quiz"    — array of 3 objects, each with:
+                    "question"      (string)
+                    "options"       (array of 4 strings)
+                    "correct_index" (integer 0-3)
+  expected_output: >
+    A JSON object with keys: title (string), lessons (array of 3 strings),
+    quiz (array of 3 objects each with question, options[4], correct_index).
+    No markdown wrapping — raw JSON only.
+  agent: training_content_generator
+
+send_response_task:
+  description: >
+    Compose and send the remediation email to {employee_email}, then log
+    the training enrolment to Splunk.
+
+    You have in your context:
+    - The threat explanation from explain_threat_task (plain text)
+    - The training module JSON from generate_training_task
+
+    Recipient:   {employee_email}
+    Token:       {token}
+    Campaign ID: {campaign_id}
+
+    Step 1 — Compose an HTML email using EXACTLY this structure and inline CSS.
+      Do NOT change the CSS values or layout — only fill in the content placeholders.
+
+      <div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#ffffff;padding:32px;border:1px solid #e8e8e8;border-radius:4px;">
+        <h2 style="font-size:20px;font-weight:bold;color:#111;margin:0 0 8px 0;">Security Simulation Alert</h2>
+        <hr style="border:none;border-top:1px solid #e8e8e8;margin:0 0 24px 0;">
+        <p style="font-size:15px;color:#333;line-height:1.7;margin:0 0 24px 0;">[SHORT INTRO — 1 sentence]</p>
+        <h3 style="font-size:15px;font-weight:bold;color:#111;margin:0 0 8px 0;">What just happened?</h3>
+        <p style="font-size:14px;color:#444;line-height:1.8;margin:0 0 24px 0;">[THREAT EXPLANATION — convert line breaks to &lt;br&gt;]</p>
+        <h3 style="font-size:15px;font-weight:bold;color:#111;margin:0 0 8px 0;">What to watch for next time</h3>
+        <ul style="font-size:14px;color:#444;line-height:2;margin:0 0 24px 0;padding-left:20px;">
+          [3 TRAINING LESSONS as &lt;li&gt; items]
+        </ul>
+        <h3 style="font-size:15px;font-weight:bold;color:#111;margin:0 0 8px 0;">Quick Knowledge Check</h3>
+        <ol style="font-size:14px;color:#444;line-height:2;margin:0 0 24px 0;padding-left:20px;">
+          [3 QUIZ QUESTIONS — each question followed by its 4 options as a nested &lt;ul&gt;. Do not reveal the correct answer.]
+        </ol>
+        <hr style="border:none;border-top:1px solid #e8e8e8;margin:0 0 16px 0;">
+        <p style="font-size:13px;color:#888;line-height:1.6;margin:0 0 8px 0;">If you have any questions, please contact the Security Awareness Team at splunksecuritycampaign@gmail.com</p>
+        <p style="font-size:13px;color:#888;margin:0;">Warm regards,<br><strong style="color:#555;">Security Awareness Team</strong><br>WhatThePhish Security Operations Center</p>
+      </div>
+
+    Step 2 — Call EmailSendTool with:
+               to_email     = {employee_email}
+               subject      = "Security Awareness: You clicked a phishing simulation"
+               html_body    = the composed HTML from Step 1
+               sender_name  = "Security Awareness Team"
+               sender_email = ""
+
+    Step 3 — Call SplunkHECTool with:
+               event      = {{"type": "training_enrolled", "token": "{token}",
+                             "campaign_id": "{campaign_id}",
+                             "employee_email": "{employee_email}",
+                             "is_simulation": true}}
+               sourcetype = "phishing:training"
+  expected_output: >
+    Confirmation that the remediation email was sent to {employee_email}
+    and that the training_enrolled event was logged to Splunk.
+    Format: "Remediation email sent to <email>. Splunk training_enrolled event logged."
+  agent: response_sender
