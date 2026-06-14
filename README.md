@@ -1,6 +1,6 @@
 # WhatThePhish
 
-> Fully autonomous phishing simulation and security awareness platform powered by multi-agent AI and Splunk.
+> Fully autonomous phishing simulation and security awareness platform powered by Agentic AI and Splunk.
 
 ![Architecture Diagram](./WhatThePhish%20Architecture%20Diagram.svg)
 
