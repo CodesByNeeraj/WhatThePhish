@@ -12,6 +12,11 @@
 
 ---
 
+## See this deck to get an overview
+https://drive.google.com/file/d/1WHzPKX7Mtwyv7HUFG-zrCDgJgElXsgmG/view?usp=drive_link
+
+---
+
 ## What It Does
 
 WhatThePhish runs end-to-end phishing simulations with zero manual intervention:
