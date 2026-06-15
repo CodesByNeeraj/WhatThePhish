@@ -6,6 +6,12 @@
 
 ---
 
+## Demo Video
+
+[![WhatThePhish Demo](https://img.youtube.com/vi/_TXp1Ryn4qc/0.jpg)](https://youtu.be/_TXp1Ryn4qc?si=TkMjqSTZ1jUdIJF_)
+
+---
+
 ## What It Does
 
 WhatThePhish runs end-to-end phishing simulations with zero manual intervention:
