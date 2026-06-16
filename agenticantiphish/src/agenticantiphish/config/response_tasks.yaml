@@ -1,7 +1,7 @@
 explain_threat_task:
   description: >
-    Write a personalised, empathetic threat explanation for {employee_email},
-    who just clicked a phishing simulation email.
+    Analyse the phishing simulation email that {employee_email} just clicked
+    and return a JSON object with two keys.
 
     The phishing email they received:
       Subject:          {phishing_subject}
@@ -9,23 +9,30 @@ explain_threat_task:
       Technique used:   {technique}
       Department:       {department}
 
-    Your explanation must:
-    1. Open by clearly stating this was a safe, authorised simulation —
-       they are not in trouble and no real harm occurred.
-    2. List 4-6 specific red flags IN THIS EMAIL they should have noticed.
-       - Reference the actual subject line and sender display name where relevant.
-       - When discussing the sender address, speak ONLY about the TYPE of
-         suspicious pattern (e.g. "unknown external domain", "spoofed display name
-         that doesn't match a real company address") — do NOT invent or quote a
-         specific email address that was not provided to you.
-       - Each red flag must explain WHY it is suspicious.
-    3. Use plain, friendly language. No jargon. No shame.
-    4. Be between 280 and 380 words.
-    5. Do NOT include HTML tags — plain text only.
+    Return ONLY a raw JSON object — no markdown, no code fences — with exactly:
+      "intro"      — 2-3 friendly sentences: reassure them this was a safe,
+                     authorised simulation, they are not in trouble, and
+                     these exercises help everyone improve.
+      "red_flags"  — a JSON array of EXACTLY 4 to 6 strings. Each string is
+                     one specific red flag present in THIS email. Rules:
+                     - Must reference the actual subject line "{phishing_subject}"
+                       or sender name "{phishing_sender}" where relevant.
+                     - Each flag must explain WHAT the signal was AND WHY it
+                       is suspicious (one clear sentence each).
+                     - Do NOT invent or quote a specific email address —
+                       refer only to patterns (e.g. "external domain",
+                       "spoofed display name").
+                     - No generic advice — every flag must be specific to
+                       this email.
+
+    You MUST produce between 4 and 6 red_flags. Fewer than 4 or more than 6
+    is incorrect output.
   expected_output: >
-    A 280-380 word plain-text explanation addressed to the employee.
-    Contains 4-6 numbered red flags that reference the specific subject
-    and sender from the simulation. No HTML, no markdown headers.
+    Raw JSON only — no markdown, no code fences.
+    Example shape:
+    {"intro": "...", "red_flags": ["Red flag 1 ...", "Red flag 2 ...", "Red flag 3 ...", "Red flag 4 ..."]}
+    The red_flags array must contain 4-6 items, each referencing specifics
+    of the simulation email.
   agent: threat_explainer
 
 generate_training_task:
@@ -35,20 +42,21 @@ generate_training_task:
 
     The module must contain:
     1. A clear title: "Security Tip: Spotting {technique} Phishing"
-    2. Exactly three key lessons — each 1-2 sentences — specific to
-       how "{technique}" attacks work and how to spot them.
+    2. Exactly 2 to 3 key lessons — each 1-2 sentences — specific to
+       how "{technique}" attacks work and what to watch for next time.
+       These must be actionable tips, not generic advice.
     3. A 3-question multiple-choice quiz. Each question has 4 options
        and one correct answer.
 
     Return a JSON object with exactly these keys:
       "title"   — string
-      "lessons" — array of 3 strings
+      "lessons" — array of exactly 2 or 3 strings (no more, no fewer)
       "quiz"    — array of 3 objects, each with:
                     "question"      (string)
                     "options"       (array of 4 strings)
                     "correct_index" (integer 0-3)
   expected_output: >
-    A JSON object with keys: title (string), lessons (array of 3 strings),
+    A JSON object with keys: title (string), lessons (array of 2-3 strings),
     quiz (array of 3 objects each with question, options[4], correct_index).
     No markdown wrapping — raw JSON only.
   agent: training_content_generator
@@ -68,16 +76,20 @@ send_response_task:
 
     Step 1 — Compose an HTML email using EXACTLY this structure and inline CSS.
       Do NOT change the CSS values or layout — only fill in the content placeholders.
+      The threat explanation from explain_threat_task is a JSON object with keys
+      "intro" (string) and "red_flags" (array of 4-6 strings). Use them as described below.
 
       <div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#ffffff;padding:32px;border:1px solid #e8e8e8;border-radius:4px;">
         <h2 style="font-size:20px;font-weight:bold;color:#111;margin:0 0 8px 0;">Security Simulation Alert</h2>
         <hr style="border:none;border-top:1px solid #e8e8e8;margin:0 0 24px 0;">
-        <p style="font-size:15px;color:#333;line-height:1.7;margin:0 0 24px 0;">[SHORT INTRO — 1 sentence]</p>
-        <h3 style="font-size:15px;font-weight:bold;color:#111;margin:0 0 8px 0;">What just happened?</h3>
-        <p style="font-size:14px;color:#444;line-height:1.8;margin:0 0 24px 0;">[THREAT EXPLANATION — convert line breaks to &lt;br&gt;]</p>
+        <p style="font-size:15px;color:#333;line-height:1.7;margin:0 0 24px 0;">[INSERT intro string from explain_threat_task JSON here]</p>
+        <h3 style="font-size:15px;font-weight:bold;color:#111;margin:0 0 8px 0;">Red flags in this email</h3>
+        <ol style="font-size:14px;color:#444;line-height:2;margin:0 0 24px 0;padding-left:20px;">
+          [INSERT each item from red_flags array as a &lt;li&gt; — must be 4 to 6 items]
+        </ol>
         <h3 style="font-size:15px;font-weight:bold;color:#111;margin:0 0 8px 0;">What to watch for next time</h3>
         <ul style="font-size:14px;color:#444;line-height:2;margin:0 0 24px 0;padding-left:20px;">
-          [3 TRAINING LESSONS as &lt;li&gt; items]
+          [INSERT each lesson from generate_training_task as a &lt;li&gt; — must be 2 to 3 items]
         </ul>
         <h3 style="font-size:15px;font-weight:bold;color:#111;margin:0 0 8px 0;">Quick Knowledge Check</h3>
         <ol style="font-size:14px;color:#444;line-height:2;margin:0 0 24px 0;padding-left:20px;">
